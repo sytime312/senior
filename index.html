@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>키오스크 간편 연습 - 어르신을 위한 쉬운 주문기</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Noto Sans KR) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brandYellow: '#FACC15',
+                        brandBlue: '#1E40AF',
+                        brandNavy: '#1E3A8A',
+                        brandLightYellow: '#FEF08A',
+                        brandOrange: '#EA580C',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #F8FAFC;
+            user-select: none;
+        }
+        
+        /* High Contrast Touch Effects */
+        .btn-touch {
+            transition: transform 0.1s ease, background-color 0.15s ease;
+        }
+        .btn-touch:active {
+            transform: scale(0.96);
+        }
+
+        /* Large Text Mode Dynamic Styles - Improved layout scaling to prevent overlapping */
+        body.large-text {
+            font-size: 1.1rem;
+        }
+        body.large-text .text-xs { font-size: 0.95rem !important; line-height: 1.3 !important; }
+        body.large-text .text-sm { font-size: 1.1rem !important; line-height: 1.35 !important; }
+        body.large-text .text-base { font-size: 1.25rem !important; line-height: 1.4 !important; }
+        body.large-text .text-lg { font-size: 1.4rem !important; line-height: 1.4 !important; }
+        body.large-text .text-xl { font-size: 1.6rem !important; line-height: 1.4 !important; }
+        body.large-text .text-2xl { font-size: 1.8rem !important; line-height: 1.3 !important; }
+        body.large-text .text-3xl { font-size: 2.1rem !important; line-height: 1.3 !important; }
+        body.large-text .text-4xl { font-size: 2.6rem !important; line-height: 1.2 !important; }
+
+        /* Ensure grid and containers fit large content smoothly */
+        body.large-text #menuGrid {
+            gap: 1rem;
+        }
+        body.large-text .cat-btn {
+            padding-top: 0.85rem;
+            padding-bottom: 0.85rem;
+        }
+        
+        /* Custom Bounce Pulse for Help Bubble */
+        @keyframes gentlePulse {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .pulse-guide {
+            animation: gentlePulse 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 min-h-screen flex items-center justify-center p-0 sm:p-4">
+
+    <!-- Main Kiosk Frame (Simulates Physical Kiosk Device) -->
+    <div id="kioskContainer" class="w-full max-w-md bg-white min-h-screen sm:min-h-[840px] sm:max-h-[900px] sm:rounded-3xl shadow-2xl flex flex-col justify-between overflow-hidden relative border-4 border-slate-700">
+
+        <!-- Top Header Bar (Accessibility & Controls) -->
+        <header class="bg-brandNavy text-white px-4 py-3 flex items-center justify-between border-b-4 border-brandYellow z-20">
+            <div class="flex items-center gap-2">
+                <span class="bg-brandYellow text-brandNavy font-black text-sm px-2.5 py-1 rounded-full border border-yellow-300">
+                    카페 연습용
+                </span>
+                <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">행복 카페</h1>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <!-- Large Text Toggle Button -->
+                <button id="textSizeBtn" onclick="toggleLargeText()" class="bg-brandYellow hover:bg-yellow-300 text-brandNavy font-black text-xs sm:text-sm px-3 py-1.5 rounded-xl border-2 border-yellow-400 flex items-center gap-1 btn-touch">
+                    <i class="fa-solid fa-text-height text-base"></i>
+                    <span id="textSizeLabel">큰 글씨 ON</span>
+                </button>
+
+                <!-- Reset Button -->
+                <button onclick="resetKiosk()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 btn-touch" title="처음으로">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dynamic Guide Bubble (TTS Alternative Text Helper) -->
+        <section class="bg-yellow-100 border-b-2 border-yellow-300 px-4 py-3 flex items-start gap-3 z-10 pulse-guide">
+            <div class="w-9 h-9 rounded-full bg-brandOrange text-white flex items-center justify-center shrink-0 font-bold text-lg shadow-sm">
+                <i class="fa-solid fa-volume-high"></i>
+            </div>
+            <div class="flex-1">
+                <p id="guideStepTitle" class="text-xs font-bold text-brandOrange">1단계: 메뉴 고르기</p>
+                <p id="guideText" class="text-sm sm:text-base font-extrabold text-slate-800 leading-snug">
+                    드시고 싶은 음료를 손가락으로 눌러보세요!
+                </p>
+            </div>
+        </section>
+
+        <!-- Category Tabs -->
+        <nav id="categoryNav" class="bg-slate-100 px-2 py-2 flex gap-2 border-b-2 border-slate-200 overflow-x-auto hide-scrollbar">
+            <button onclick="selectCategory('coffee')" id="cat-coffee" class="cat-btn flex-1 py-2.5 px-3 rounded-xl font-black text-sm sm:text-base border-2 bg-brandBlue text-white border-brandNavy shadow-sm text-center whitespace-nowrap btn-touch">
+                ☕ 커피류
+            </button>
+            <button onclick="selectCategory('tea')" id="cat-tea" class="cat-btn flex-1 py-2.5 px-3 rounded-xl font-black text-sm sm:text-base border-2 bg-white text-slate-700 border-slate-300 text-center whitespace-nowrap btn-touch">
+                🍵 차/음료
+            </button>
+            <button onclick="selectCategory('dessert')" id="cat-dessert" class="cat-btn flex-1 py-2.5 px-3 rounded-xl font-black text-sm sm:text-base border-2 bg-white text-slate-700 border-slate-300 text-center whitespace-nowrap btn-touch">
+                🍰 디저트
+            </button>
+        </nav>
+
+        <!-- Main Content Area: Menu Grid -->
+        <main id="mainSection" class="flex-1 p-3 overflow-y-auto bg-slate-50">
+            <div id="menuGrid" class="grid grid-cols-2 gap-3">
+                <!-- Menu items inserted dynamically -->
+            </div>
+        </main>
+
+        <!-- Bottom Cart & Checkout Bar -->
+        <footer id="cartFooter" class="bg-white border-t-4 border-slate-200 p-3 shadow-lg z-20">
+            <!-- Cart Summary Header -->
+            <div class="flex items-center justify-between mb-2 px-1">
+                <span class="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-basket-shopping text-brandBlue"></i>
+                    선택한 항목 (<span id="cartCount" class="text-brandOrange font-black">0</span>개)
+                </span>
+                <button onclick="clearCart()" class="text-xs text-slate-500 hover:text-rose-600 underline font-bold">
+                    전체 취소
+                </button>
+            </div>
+
+            <!-- Cart Items List (Mini Scroll Area) -->
+            <div id="cartList" class="max-h-24 overflow-y-auto space-y-1.5 mb-3 pr-1 min-h-[44px]">
+                <p id="emptyCartMsg" class="text-xs sm:text-sm text-slate-400 font-bold text-center py-2 bg-slate-100 rounded-xl">
+                    메뉴를 선택하시면 여기에 담깁니다.
+                </p>
+            </div>
+
+            <!-- Total Price & Pay Action Button -->
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-200">
+                <div>
+                    <span class="text-xs text-slate-500 font-bold block">총 결제금액</span>
+                    <span id="totalPrice" class="text-xl sm:text-2xl font-black text-brandNavy">0원</span>
+                </div>
+                <button id="payStartBtn" onclick="startPayment()" disabled class="bg-slate-300 text-slate-500 font-black text-lg sm:text-xl px-6 py-3.5 rounded-2xl border-2 border-slate-400 shadow-md flex-1 text-center btn-touch">
+                    결제하기 ➔
+                </button>
+            </div>
+        </footer>
+
+        <!-- Step 2: Temperature / Option Selection Modal -->
+        <div id="optionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center hidden p-0 sm:p-4">
+            <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl border-4 border-brandBlue p-5 space-y-4 animate-in slide-in-from-bottom duration-200">
+                <div class="flex justify-between items-center border-b-2 border-slate-100 pb-3">
+                    <h2 id="modalItemTitle" class="text-xl font-black text-brandNavy">음료 이름</h2>
+                    <button onclick="closeOptionModal()" class="w-9 h-9 rounded-full bg-slate-200 text-slate-600 font-bold text-lg flex items-center justify-center">✕</button>
+                </div>
+
+                <div class="space-y-3">
+                    <p class="font-extrabold text-sm sm:text-base text-slate-700">1. 온도를 선택해 주세요:</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="setOptionTemp('HOT')" id="optHot" class="py-4 px-2 rounded-2xl border-3 border-rose-500 bg-rose-50 text-rose-700 font-black text-lg sm:text-xl flex flex-col items-center gap-1 btn-touch">
+                            🔥 따뜻하게 (HOT)
+                        </button>
+                        <button onclick="setOptionTemp('ICE')" id="optIce" class="py-4 px-2 rounded-2xl border-3 border-blue-500 bg-blue-50 text-blue-700 font-black text-lg sm:text-xl flex flex-col items-center gap-1 btn-touch">
+                            🧊 차갑게 (ICE)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button onclick="confirmAddToCart()" class="w-full py-4 bg-brandYellow hover:bg-yellow-300 text-brandNavy font-black text-xl rounded-2xl border-3 border-yellow-500 shadow-md btn-touch">
+                        장바구니에 담기 🛒
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Payment Method Selection Screen/Modal -->
+        <div id="payModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+            <div class="bg-white w-full max-w-md rounded-3xl border-4 border-brandYellow p-5 space-y-4">
+                <div class="text-center border-b-2 border-slate-100 pb-3">
+                    <span class="bg-brandOrange text-white text-xs font-bold px-3 py-1 rounded-full">마지막 단계</span>
+                    <h2 class="text-2xl font-black text-brandNavy mt-1">결제수단 선택</h2>
+                    <p class="text-sm font-bold text-slate-600">어떻게 결제하시겠습니까?</p>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="completeOrder('신용카드')" class="w-full py-4 px-4 bg-blue-50 hover:bg-blue-100 border-3 border-blue-600 rounded-2xl flex items-center justify-between text-left btn-touch">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-credit-card text-3xl text-blue-600"></i>
+                            <div>
+                                <p class="font-black text-lg text-blue-900">신용/체크 카드</p>
+                                <p class="text-xs font-bold text-blue-700">카드를 입구에 넣기</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-blue-600 text-xl"></i>
+                    </button>
+
+                    <button onclick="completeOrder('모바일 쿠폰')" class="w-full py-4 px-4 bg-amber-50 hover:bg-amber-100 border-3 border-amber-500 rounded-2xl flex items-center justify-between text-left btn-touch">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-qrcode text-3xl text-amber-600"></i>
+                            <div>
+                                <p class="font-black text-lg text-amber-900">모바일 쿠폰 / 바코드</p>
+                                <p class="text-xs font-bold text-amber-700">스마트폰 바코드 스캔</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-amber-600 text-xl"></i>
+                    </button>
+                </div>
+
+                <button onclick="closePayModal()" class="w-full py-3 bg-slate-200 text-slate-700 font-bold rounded-xl text-base">
+                    이전으로 돌아가기
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 4: Success Screen -->
+        <div id="successOverlay" class="absolute inset-0 bg-brandBlue z-50 flex flex-col items-center justify-center p-6 text-center text-white hidden animate-in fade-in duration-300">
+            <div class="w-24 h-24 rounded-full bg-brandYellow text-brandNavy flex items-center justify-center text-5xl font-black mb-4 shadow-xl">
+                👏
+            </div>
+            <h2 class="text-3xl font-black text-brandYellow mb-2">주문 성공! 축하합니다!</h2>
+            <p class="text-xl font-bold mb-6 text-blue-100">
+                어르신, 키오스크 주문을 아주 훌륭하게 완수하셨습니다! 😊
+            </p>
+
+            <div class="bg-white text-slate-800 w-full rounded-2xl p-4 mb-6 shadow-md border-2 border-yellow-300">
+                <p class="text-xs font-bold text-slate-500 mb-1">주문 번호</p>
+                <p class="text-4xl font-black text-brandOrange mb-3">105번</p>
+                <div class="border-t border-slate-200 pt-2 text-sm font-bold text-slate-600" id="receiptSummary">
+                    <!-- Order Items Summary -->
+                </div>
+            </div>
+
+            <button onclick="resetKiosk()" class="w-full py-4 bg-brandYellow hover:bg-yellow-300 text-brandNavy font-black text-xl rounded-2xl border-3 border-yellow-400 shadow-xl btn-touch">
+                다시 연습해보기 🔄
+            </button>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Menu Data Source
+        const menuData = {
+            coffee: [
+                { id: 'c1', name: '아메리카노', price: 2000, icon: '☕', hasOption: true },
+                { id: 'c2', name: '카페라떼', price: 3000, icon: '🥛', hasOption: true },
+                { id: 'c3', name: '바닐라라떼', price: 3500, icon: '🍦', hasOption: true },
+                { id: 'c4', name: '카푸치노', price: 3200, icon: '☕', hasOption: true }
+            ],
+            tea: [
+                { id: 't1', name: '유자차', price: 3000, icon: '🍋', hasOption: true },
+                { id: 't2', name: '생강차', price: 3500, icon: '🫚', hasOption: true },
+                { id: 't3', name: '복숭아 아이스티', price: 2500, icon: '🍑', hasOption: false, fixedOption: 'ICE' },
+                { id: 't4', name: '녹차', price: 2800, icon: '🍵', hasOption: true }
+            ],
+            dessert: [
+                { id: 'd1', name: '단팥빵', price: 1800, icon: '🍞', hasOption: false },
+                { id: 'd2', name: '치즈케이크', price: 4000, icon: '🍰', hasOption: false },
+                { id: 'd3', name: '호두과자', price: 3000, icon: '🥯', hasOption: false }
+            ]
+        };
+
+        // Application State
+        let currentCategory = 'coffee';
+        let cart = [];
+        let selectedMenuItem = null;
+        let selectedTemp = 'HOT';
+        let isLargeText = true;
+
+        // Step Guide Texts
+        const guideTexts = {
+            selectMenu: { title: "1단계: 메뉴 고르기", text: "드시고 싶은 메뉴를 손가락으로 눌러보세요!" },
+            selectOption: { title: "2단계: 온도 선택하기", text: "따뜻한 음료와 차가운 음료 중 하나를 선택하세요." },
+            cartAdded: { title: "장바구니 확인", text: "아래에서 메뉴와 금액을 확인하고 [결제하기]를 누르세요." },
+            payment: { title: "3단계: 결제하기", text: "신용카드 또는 모바일 쿠폰 중 원하시는 방법을 누르세요." },
+            complete: { title: "완료!", text: "주문이 완료되었습니다. 정말 잘하셨습니다!" }
+        };
+
+        // On Document Load Initialization
+        window.onload = function() {
+            renderMenuGrid();
+            updateGuide('selectMenu');
+        };
+
+        // Render Menu Items for Active Category
+        function renderMenuGrid() {
+            const grid = document.getElementById('menuGrid');
+            grid.innerHTML = '';
+
+            const items = menuData[currentCategory] || [];
+            items.forEach(item => {
+                const itemCard = document.createElement('div');
+                itemCard.className = `bg-white rounded-2xl border-3 border-slate-200 p-3 flex flex-col items-center justify-between text-center shadow-xs hover:border-brandBlue btn-touch cursor-pointer`;
+                itemCard.onclick = () => handleItemClick(item);
+
+                itemCard.innerHTML = `
+                    <div class="text-4xl sm:text-5xl my-1 shrink-0">${item.icon}</div>
+                    <div class="w-full my-1">
+                        <h3 class="font-black text-slate-800 text-base sm:text-lg leading-snug mb-1 break-keep">${item.name}</h3>
+                        <p class="font-bold text-brandBlue text-sm sm:text-base">${item.price.toLocaleString()}원</p>
+                    </div>
+                    <button class="mt-2 w-full py-2 bg-brandYellow hover:bg-yellow-300 text-brandNavy font-black text-xs sm:text-sm rounded-xl border-2 border-yellow-400 shrink-0">
+                        선택하기
+                    </button>
+                `;
+                grid.appendChild(itemCard);
+            });
+        }
+
+        // Handle Category Switch
+        function selectCategory(catKey) {
+            currentCategory = catKey;
+            
+            // Update Tab Styling
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.className = "cat-btn flex-1 py-2.5 px-3 rounded-xl font-black text-sm sm:text-base border-2 bg-white text-slate-700 border-slate-300 text-center whitespace-nowrap btn-touch";
+            });
+
+            const activeBtn = document.getElementById(`cat-${catKey}`);
+            if (activeBtn) {
+                activeBtn.className = "cat-btn flex-1 py-2.5 px-3 rounded-xl font-black text-sm sm:text-base border-2 bg-brandBlue text-white border-brandNavy shadow-sm text-center whitespace-nowrap btn-touch";
+            }
+
+            renderMenuGrid();
+        }
+
+        // Handle Item Clicked
+        function handleItemClick(item) {
+            selectedMenuItem = item;
+            if (item.hasOption) {
+                // Show Temperature Option Modal
+                document.getElementById('modalItemTitle').innerText = item.name;
+                setOptionTemp('HOT'); // default
+                document.getElementById('optionModal').classList.remove('hidden');
+                updateGuide('selectOption');
+            } else {
+                // Direct Add to Cart
+                addToCart(item.name, item.price, item.fixedOption || '');
+            }
+        }
+
+        // Option Modal Temperature Toggle
+        function setOptionTemp(temp) {
+            selectedTemp = temp;
+            const hotBtn = document.getElementById('optHot');
+            const iceBtn = document.getElementById('optIce');
+
+            if (temp === 'HOT') {
+                hotBtn.className = "py-4 px-2 rounded-2xl border-4 border-rose-600 bg-rose-500 text-white font-black text-lg sm:text-xl flex flex-col items-center gap-1 shadow-md btn-touch";
+                iceBtn.className = "py-4 px-2 rounded-2xl border-2 border-slate-300 bg-slate-50 text-slate-500 font-bold text-lg sm:text-xl flex flex-col items-center gap-1 opacity-70 btn-touch";
+            } else {
+                iceBtn.className = "py-4 px-2 rounded-2xl border-4 border-blue-600 bg-blue-500 text-white font-black text-lg sm:text-xl flex flex-col items-center gap-1 shadow-md btn-touch";
+                hotBtn.className = "py-4 px-2 rounded-2xl border-2 border-slate-300 bg-slate-50 text-slate-500 font-bold text-lg sm:text-xl flex flex-col items-center gap-1 opacity-70 btn-touch";
+            }
+        }
+
+        function closeOptionModal() {
+            document.getElementById('optionModal').classList.add('hidden');
+            updateGuide('selectMenu');
+        }
+
+        function confirmAddToCart() {
+            if (!selectedMenuItem) return;
+            const optionStr = selectedTemp === 'HOT' ? '따뜻하게 (HOT)' : '차가운 (ICE)';
+            addToCart(`${selectedMenuItem.name} [${optionStr}]`, selectedMenuItem.price);
+            closeOptionModal();
+        }
+
+        // Cart Management
+        function addToCart(fullName, price) {
+            const existing = cart.find(c => c.name === fullName);
+            if (existing) {
+                existing.count += 1;
+            } else {
+                cart.push({ name: fullName, price: price, count: 1 });
+            }
+            renderCart();
+            updateGuide('cartAdded');
+        }
+
+        function renderCart() {
+            const cartList = document.getElementById('cartList');
+            const emptyMsg = document.getElementById('emptyCartMsg');
+            const cartCountEl = document.getElementById('cartCount');
+            const totalPriceEl = document.getElementById('totalPrice');
+            const payBtn = document.getElementById('payStartBtn');
+
+            // Clear previous dynamically added items (keep emptyMsg template reference safe)
+            cartList.innerHTML = '';
+
+            if (cart.length === 0) {
+                if (emptyMsg) {
+                    cartList.appendChild(emptyMsg);
+                    emptyMsg.classList.remove('hidden');
+                } else {
+                    cartList.innerHTML = `<p id="emptyCartMsg" class="text-xs sm:text-sm text-slate-400 font-bold text-center py-2 bg-slate-100 rounded-xl">
+                        메뉴를 선택하시면 여기에 담깁니다.
+                    </p>`;
+                }
+                cartCountEl.innerText = '0';
+                totalPriceEl.innerText = '0원';
+                payBtn.disabled = true;
+                payBtn.className = "bg-slate-300 text-slate-500 font-black text-lg sm:text-xl px-6 py-3.5 rounded-2xl border-2 border-slate-400 shadow-md flex-1 text-center cursor-not-allowed";
+                return;
+            }
+
+            let totalCount = 0;
+            let totalPrice = 0;
+
+            cart.forEach((item, index) => {
+                totalCount += item.count;
+                totalPrice += (item.price * item.count);
+
+                const row = document.createElement('div');
+                row.className = "flex items-center justify-between bg-yellow-50 border border-yellow-300 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold text-slate-800";
+                row.innerHTML = `
+                    <span class="truncate max-w-[170px]">${item.name}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-brandBlue font-black">${(item.price * item.count).toLocaleString()}원</span>
+                        <div class="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-1">
+                            <button onclick="changeQty(${index}, -1)" class="w-5 h-5 text-slate-600 font-bold flex items-center justify-center">-</button>
+                            <span class="px-1 text-xs text-brandNavy font-extrabold">${item.count}</span>
+                            <button onclick="changeQty(${index}, 1)" class="w-5 h-5 text-slate-600 font-bold flex items-center justify-center">+</button>
+                        </div>
+                    </div>
+                `;
+                cartList.appendChild(row);
+            });
+
+            cartCountEl.innerText = totalCount;
+            totalPriceEl.innerText = `${totalPrice.toLocaleString()}원`;
+
+            // Enable Pay Button
+            payBtn.disabled = false;
+            payBtn.className = "bg-brandYellow hover:bg-yellow-300 text-brandNavy font-black text-lg sm:text-xl px-6 py-3.5 rounded-2xl border-3 border-yellow-500 shadow-lg flex-1 text-center btn-touch cursor-pointer";
+        }
+
+        function changeQty(index, delta) {
+            if (cart[index]) {
+                cart[index].count += delta;
+                if (cart[index].count <= 0) {
+                    cart.splice(index, 1);
+                }
+            }
+            renderCart();
+        }
+
+        function clearCart() {
+            cart = [];
+            renderCart();
+            updateGuide('selectMenu');
+        }
+
+        // Step 3: Payment Step
+        function startPayment() {
+            if (cart.length === 0) return;
+            document.getElementById('payModal').classList.remove('hidden');
+            updateGuide('payment');
+        }
+
+        function closePayModal() {
+            document.getElementById('payModal').classList.add('hidden');
+            updateGuide('cartAdded');
+        }
+
+        function completeOrder(payMethod) {
+            closePayModal();
+            updateGuide('complete');
+
+            // Render Receipt Summary in Success Screen
+            const receipt = document.getElementById('receiptSummary');
+            receipt.innerHTML = cart.map(i => `<div class="flex justify-between"><span>${i.name} (${i.count}개)</span> <span>${(i.price * i.count).toLocaleString()}원</span></div>`).join('') +
+                `<div class="mt-2 pt-2 border-t border-slate-300 font-black text-brandNavy flex justify-between"><span>결제 방법</span><span>${payMethod}</span></div>`;
+
+            document.getElementById('successOverlay').classList.remove('hidden');
+        }
+
+        // Reset App
+        function resetKiosk() {
+            cart = [];
+            renderCart();
+            document.getElementById('optionModal').classList.add('hidden');
+            document.getElementById('payModal').classList.add('hidden');
+            document.getElementById('successOverlay').classList.add('hidden');
+            selectCategory('coffee');
+            updateGuide('selectMenu');
+        }
+
+        // Large Text Mode Toggle
+        function toggleLargeText() {
+            isLargeText = !isLargeText;
+            const container = document.body;
+            const label = document.getElementById('textSizeLabel');
+
+            if (isLargeText) {
+                container.classList.add('large-text');
+                label.innerText = '큰 글씨 ON';
+            } else {
+                container.classList.remove('large-text');
+                label.innerText = '큰 글씨 OFF';
+            }
+            renderMenuGrid();
+        }
+
+        // Helper: Dynamic Voice Guide Updates
+        function updateGuide(stepKey) {
+            const info = guideTexts[stepKey];
+            if (!info) return;
+            
+            const titleEl = document.getElementById('guideStepTitle');
+            const textEl = document.getElementById('guideText');
+
+            if (titleEl) titleEl.innerText = info.title;
+            if (textEl) textEl.innerText = info.text;
+        }
+    </script>
+</body>
+</html>
